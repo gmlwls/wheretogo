@@ -1,0 +1,179 @@
+<script type="text/javascript" src="//apis.daum.net/maps/maps3.js?apikey=e78e73fb03c7df3623d3f3aeaece86a3"></script>
+
+<div class="users">
+  <% @places.each do |place| %>
+  <div class = "user<%=place.user_id%>">
+    <input class="room_id" type="hidden" value=<%=place.room_id%>></input>
+    <input class="user_id" type="hidden" value=<%=place.user_id%>></input>
+    [USER = <%=place.user_id%>] 위도 : <input type="text" class="lat"></input>
+    경도 : <input type="text" class="lon"></input>
+    <button id="submit">확인</button>
+  </div>
+  <% end %>
+</div>
+
+
+<div id="map" style="width:500px;height:400px;"></div>
+<button href="" id="find">중간지점 찾기</button>
+
+<script>
+$(document).ready(function(){
+  
+  var container = document.getElementById('map'); //지도를 담을 영역의 DOM 레퍼런스
+  var options = { //지도를 생성할 때 필요한 기본 옵션
+    center: new daum.maps.LatLng(33.450701, 126.570667), //지도의 중심좌표.
+    level: 3 //지도의 레벨(확대, 축소 정도)
+  };
+  var map = new daum.maps.Map(container, options); //지도 생성 및 객체 리턴
+  
+  daum.maps.event.addListener(map, 'click', function(mouseEvent){
+    var length = markersPos.length;
+    if(length >= <%=@places.size%>){
+      alert("불가능해요");
+    }else{
+      addMarker(mouseEvent.latLng);
+    }
+  });
+
+  
+  // 지도에 표시된 마커 객체를 가지고 있을 배열입니다
+  var markers = [];
+  //인포 윈도우
+  var iwContents = [];
+  //중간 지점을 저장할 배열
+  var midPoint = [];
+  var markersPos = [];
+  
+  //중간지점을 찾는 함수
+  $('#find').click(function findMidPosition() {
+    if(markersPos.length != <%=@count%>){
+      alert("지도에 마커를 찍어주세요");
+    }else{
+      var midPosLat = 0, midPosLng = 0;
+      for(var i=0;i<markersPos.length;i++){
+        midPosLat += markersPos[i].newLat * 1;
+        midPosLng += markersPos[i].newLng * 1;
+      }
+      midPosLat = (midPosLat/markersPos.length).toFixed(4);
+      midPosLng = (midPosLng/markersPos.length).toFixed(4);
+      //console.log(midPosLat);
+      //console.log(midPosLng);
+      
+      var marker = new daum.maps.Marker({
+        map: map
+      });
+      
+      if(midPoint.length ==1){
+        midPoint[0].setMap(null);
+        midPoint.pop();
+      }
+      
+      marker.setPosition(new daum.maps.LatLng(midPosLat, midPosLng));
+      midPoint.push(marker);
+      marker.setMap(map);
+    }
+  });
+  
+  // 마커를 생성하고 지도위에 표시하는 함수입니다
+  function addMarker(position) {
+    
+    // 마커를 생성합니다
+    var marker = new daum.maps.Marker({
+        map: map,
+        position: position,
+        draggable: true
+    });
+    
+    var markerPos = {
+      newLat: position.getLat().toFixed(4),
+      newLng: position.getLng().toFixed(4)
+    };
+    
+    var iwContent = new daum.maps.InfoWindow({
+      position: position,
+      content: "마커의 위치는 "+position.getLat().toFixed(4)+","+position.getLng().toFixed(4)+"입니다.",
+      removable: true
+    });
+    
+    marker.setMap(map);
+    iwContent.open(map, marker);
+    
+    markers.push(marker);
+    iwContents.push(iwContent);
+    markersPos.push(markerPos);
+    
+    var draggedMarker = {};
+    var markerNum = 0;
+    
+    daum.maps.event.addListener(marker, 'dragstart', function(){
+      draggedMarker.Lat = marker.getPosition().getLat().toFixed(4);
+      draggedMarker.Lng = marker.getPosition().getLng().toFixed(4);
+      
+      //markersPos 배열의 몇번째 index가 드래그 되었는지
+      for(var i=0; i<markersPos.length; i++){
+        if(draggedMarker.Lat == markersPos[i].newLat && draggedMarker.Lng == markersPos[i].newLng){
+          markerNum = i;
+        }
+      }
+    });
+    
+    daum.maps.event.addListener(marker, 'dragend', function(){
+      iwContent.close(map, marker); //기존 인포윈도우 닫기
+      iwContent = new daum.maps.InfoWindow({
+        position: marker.getPosition(),
+        content: "마커의 위치는 "+marker.getPosition().getLat().toFixed(4)+","+marker.getPosition().getLng().toFixed(4)+"입니다.",
+        removable: true
+      })
+      
+      var newPos = {
+        newLat: marker.getPosition().getLat().toFixed(4),
+        newLng: marker.getPosition().getLng().toFixed(4)
+      };
+      markersPos[markerNum] = newPos;
+      
+      iwContent.open(map, marker);
+      iwContents.pop();//기존 내용 제거
+      iwContents.push(iwContent);
+      $(".user<%=@user_id%>").find(".lat").val(newPos['newLat']);
+      $(".user<%=@user_id%>").find(".lon").val(newPos['newLng']);
+    });
+    
+  }
+  
+  if(navigator.geolocation){
+    navigator.geolocation.getCurrentPosition(function(position){
+      var lat = position.coords.latitude;
+      var lng = position.coords.longitude;
+      $(".user<%=@user_id%>").find(".lat").val(lat);
+      $(".user<%=@user_id%>").find(".lon").val(lng);
+      
+      var locPosition = new daum.maps.LatLng(lat,lng);
+      addMarker(locPosition);
+      
+    });
+  }else {
+    var locPosition = new daum.maps.LatLng(33.450701, 126.570667);
+    var message = 'geolocation을 사용할 수 없어요...';
+    
+    displayMarker(locPosition, message)
+  }
+  
+  
+  function displayMarker(locPosition, message){
+    var geoMarker = new daum.maps.Marker({
+      map: map,
+      position: locPosition
+    });
+    var geoiwContent = message
+    var infowindow = new daum.maps.InfoWindow({
+      content: geoiwContent
+    });
+    
+    infowindow.open(map, geoMarker);
+    map.setCenter(locPosition);
+  }
+  
+  
+ 
+});
+</script>
