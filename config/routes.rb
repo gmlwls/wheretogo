@@ -1,4 +1,5 @@
 Rails.application.routes.draw do
+
   root 'rooms#index'
   
   get 'rooms/index'
@@ -6,7 +7,8 @@ Rails.application.routes.draw do
   get 'rooms/join/:room_id' => 'rooms#join',as: 'join'
   get 'rooms/show/:room_id' => 'rooms#show',as: 'show'
   
-  post 'places/create',as: 'place_create'
+  post 'places/create/:room_id/:user_id' => 'places#create',as: 'places_create'
+  get 'places/refresh/:room_id' => 'places#refresh',as: 'places_refresh'
   
   devise_for :users
   # The priority is based upon order of creation: first created -> highest priority.
